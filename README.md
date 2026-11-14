@@ -65,24 +65,33 @@
 
 ## 📦 Установка
 
-### Из AUR (рекомендуется для Arch Linux)
-
-```bash
-yay -S mewfetch
-# или
-paru -S mewfetch
-```
-
 ### Из исходников (любой дистрибутив)
 
 ```bash
 git clone https://github.com/zagadka298-design/mewfetch.git
 cd mewfetch
-chmod +x mewfetch.py
-./mewfetch.py
+pip install .
+```
 
-# Установка в систему
-sudo install -Dm755 mewfetch.py /usr/local/bin/mewfetch
+После этого команда `mewfetch` будет доступна глобально.
+
+### Запуск без установки
+
+```bash
+git clone https://github.com/zagadka298-design/mewfetch.git
+cd mewfetch
+python3 -m mewfetch
+```
+
+### Из AUR (Arch Linux)
+
+> [!WARNING]
+> AUR-пакет пока не обновлён до v2.1.0 — используйте установку из исходников выше.
+
+```bash
+yay -S mewfetch
+# или
+paru -S mewfetch
 ```
 
 ---
