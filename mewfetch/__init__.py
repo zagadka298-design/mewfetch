@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-mewfetch v2.0.0 — система информации с ASCII-котом 🐱
+mewfetch v2.1.0 — система информации с ASCII-котом 🐱
 Нулевые зависимости · Параллельный сбор · Полностью настраиваемый
 
 Новое в v2.0:
@@ -10,6 +10,11 @@ mewfetch v2.0.0 — система информации с ASCII-котом 🐱
   · 4 стиля ASCII-кота (classic, small, sleeping, box)
   · CLI: --style, --theme, --fields, --no-color, --no-art, --json, --save-config
   · Конфиг файл: ~/.config/mewfetch/config
+
+Новое в v2.1:
+  · Поддержка пользовательского логотипа через config.json
+  · logo_path: путь к файлу с ASCII-артом или изображением
+  · logo_type: "ascii" (текстовый арт) или "image" (PNG/JPG через term-image или Kitty)
 """
 
 import argparse
@@ -25,7 +30,7 @@ import time
 from pathlib import Path
 from typing import Callable
 
-VERSION = "2.0.0"
+VERSION = "2.1.0"
 RESET = "\033[0m"
 
 # ─────────────────────────── Цветовые темы ────────────────────────────────────
@@ -531,16 +536,21 @@ def gather_info(
 
 
 # ─────────────────────────── Конфиг файл ──────────────────────────────────────
-xdg_config  = os.environ.get("XDG_CONFIG_HOME")
-CONFIG_DIR  = Path(xdg_config) / "mewfetch" if xdg_config else Path.home() / ".config" / "mewfetch"
-CONFIG_PATH = CONFIG_DIR / "config"
-_DEFAULTS   = {
+xdg_config      = os.environ.get("XDG_CONFIG_HOME")
+CONFIG_DIR      = Path(xdg_config) / "mewfetch" if xdg_config else Path.home() / ".config" / "mewfetch"
+CONFIG_PATH     = CONFIG_DIR / "config"
+CONFIG_JSON     = CONFIG_DIR / "config.json"
+_DEFAULTS       = {
     "style": "classic",
     "theme": "pink",
     "fields": "",
     "show_na": "false",
     "no_color": "false",
     "no_art": "false",
+}
+_JSON_DEFAULTS = {
+    "logo_path": "",
+    "logo_type": "ascii",
 }
 
 DEFAULT_CONFIG_TEXT = """# mewfetch config
@@ -569,11 +579,30 @@ no_art = false
 
 
 def ensure_config_exists() -> None:
-    """Создаёт шаблонный конфиг файл, если он ещё не существует."""
+    """Создаёт директорию конфига, INI-конфиг и config.json, если их ещё нет.
+
+    Каждый файл создаётся независимо — ошибка одного не блокирует другой.
+    """
+    # 1. Директория
+    try:
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return  # Если директорию создать нельзя — дальше смысла нет
+
+    # 2. INI-конфиг (style, theme, …)
     try:
         if not CONFIG_PATH.exists():
-            CONFIG_DIR.mkdir(parents=True, exist_ok=True)
             CONFIG_PATH.write_text(DEFAULT_CONFIG_TEXT, encoding="utf-8")
+    except OSError:
+        pass
+
+    # 3. JSON-конфиг (logo_path, logo_type)
+    try:
+        if not CONFIG_JSON.exists():
+            CONFIG_JSON.write_text(
+                json.dumps(_JSON_DEFAULTS, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
     except OSError:
         pass
 
@@ -619,6 +648,143 @@ def load_config() -> dict[str, str]:
     return cfg
 
 
+def load_logo_config() -> dict[str, str]:
+    """Загружает config.json с настройками логотипа.
+
+    Возвращает словарь с ключами:
+      logo_path — путь к файлу логотипа (пустая строка → стандартный кот)
+      logo_type — "ascii" или "image"
+    """
+    cfg = dict(_JSON_DEFAULTS)
+    if not CONFIG_JSON.exists():
+        return cfg
+    try:
+        with open(CONFIG_JSON, encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data.get("logo_path"), str):
+            cfg["logo_path"] = data["logo_path"]
+        if data.get("logo_type") in ("ascii", "image"):
+            cfg["logo_type"] = data["logo_type"]
+    except (OSError, json.JSONDecodeError):
+        pass
+    return cfg
+
+
+def _expand(path: str) -> str:
+    """Разворачивает ~ и переменные окружения в пути."""
+    return os.path.expandvars(os.path.expanduser(path))
+
+
+def load_ascii_logo(path: str) -> list[str] | None:
+    """Читает ASCII-арт из файла. При ошибке возвращает None."""
+    try:
+        full = _expand(path)
+        with open(full, encoding="utf-8") as f:
+            lines = f.read().splitlines()
+        return lines
+    except FileNotFoundError:
+        print(
+            f"⚠️  mewfetch: файл логотипа не найден: {path!r} — используется стандартный кот.",
+            file=sys.stderr,
+        )
+        return None
+    except OSError as e:
+        print(
+            f"⚠️  mewfetch: ошибка чтения логотипа ({e}) — используется стандартный кот.",
+            file=sys.stderr,
+        )
+        return None
+
+
+def _try_kitty_image(path: str) -> bool:
+    """Пробует вывести изображение через Kitty Graphics Protocol (APC-последовательность).
+
+    Возвращает True, если вывод, вероятно, сработал (терминал Kitty активен).
+    """
+    if not os.environ.get("KITTY_WINDOW_ID"):
+        return False
+    full = _expand(path)
+    if not os.path.isfile(full):
+        return False
+    try:
+        import base64
+        import struct
+        import zlib
+
+        with open(full, "rb") as f:
+            raw = f.read()
+
+        # Простая передача через APC без сжатия (формат Kitty: a=T,f=100 для PNG)
+        # Kitty принимает base64-закодированные данные порциями до 4096 байт
+        encoded = base64.standard_b64encode(raw).decode("ascii")
+        chunk_size = 4096
+        chunks = [encoded[i : i + chunk_size] for i in range(0, len(encoded), chunk_size)]
+
+        for idx, chunk in enumerate(chunks):
+            is_last = idx == len(chunks) - 1
+            m = 0 if is_last else 1
+            if idx == 0:
+                payload = f"\x1b_Ga=T,f=100,m={m};{chunk}\x1b\\"
+            else:
+                payload = f"\x1b_Gm={m};{chunk}\x1b\\"
+            sys.stdout.write(payload)
+            sys.stdout.flush()
+
+        sys.stdout.write("\n")
+        sys.stdout.flush()
+        return True
+    except Exception:
+        return False
+
+
+def _try_term_image(path: str) -> bool:
+    """Пробует вывести изображение через библиотеку term-image.
+
+    Возвращает True при успехе.
+    """
+    full = _expand(path)
+    if not os.path.isfile(full):
+        return False
+    try:
+        from term_image.image import AutoImage  # type: ignore
+
+        img = AutoImage(full)
+        img.draw()
+        return True
+    except ImportError:
+        return False
+    except Exception:
+        return False
+
+
+def render_image_logo(path: str) -> bool:
+    """Выводит изображение любым доступным методом.
+
+    Порядок попыток: Kitty → term-image.
+    Возвращает True при успехе, False если ни один метод не сработал.
+    """
+    full = _expand(path)
+    if not os.path.isfile(full):
+        print(
+            f"⚠️  mewfetch: файл изображения не найден: {path!r} — используется стандартный кот.",
+            file=sys.stderr,
+        )
+        return False
+
+    if _try_kitty_image(path):
+        return True
+    if _try_term_image(path):
+        return True
+
+    print(
+        "⚠️  mewfetch: не удалось отобразить изображение. "
+        "Установите term-image (`pip install term-image`) или используйте терминал Kitty. "
+        "Используется стандартный кот.",
+        file=sys.stderr,
+    )
+    return False
+
+
 def save_config(args: argparse.Namespace) -> None:
     """Сохраняет текущие настройки в конфиг файл."""
     try:
@@ -654,11 +820,12 @@ def color_swatch(no_color: bool = False) -> list[str]:
 
 
 def render(
-    style:    str,
-    theme:    dict[str, str],
-    info:     list[tuple[str, str]],
-    no_art:   bool,
-    no_color: bool,
+    style:      str,
+    theme:      dict[str, str],
+    info:       list[tuple[str, str]],
+    no_art:     bool,
+    no_color:   bool,
+    logo_cfg:   dict[str, str] | None = None,
 ) -> None:
     reset = "" if no_color else RESET
     if no_color:
@@ -688,6 +855,35 @@ def render(
             print(line)
         return
 
+    # ── Определяем источник левой колонки (логотип) ───────────────────────────
+    logo_path = (logo_cfg or {}).get("logo_path", "").strip()
+    logo_type = (logo_cfg or {}).get("logo_type", "ascii")
+
+    if logo_path:
+        if logo_type == "image":
+            # Для image-режима выводим изображение отдельно, затем инфо
+            if render_image_logo(logo_path):
+                for line in info_lines:
+                    print(line)
+                return
+            # Если не получилось — падаем на стандартного кота
+            logo_path = ""
+        else:
+            # ascii-режим
+            custom_lines = load_ascii_logo(logo_path)
+            if custom_lines is not None:
+                cat       = custom_lines
+                cat_color = theme.get("cat", "")
+                cat_width = max((len(line) for line in cat), default=0)
+                rows      = max(len(cat), len(info_lines))
+                for i in range(rows):
+                    cp = cat[i]        if i < len(cat)        else ""
+                    ip = info_lines[i] if i < len(info_lines) else ""
+                    print(f"{cat_color}{cp:<{cat_width}}{reset}  {ip}")
+                return
+            # Файл не найден — стандартный кот (logo_path уже сброшен ниже)
+
+    # ── Стандартный ASCII-кот ─────────────────────────────────────────────────
     cat       = CAT_STYLES.get(style, CAT_STYLES["classic"])
     cat_color = theme.get("cat", "")
     cat_width = max(len(line) for line in cat)
@@ -762,8 +958,9 @@ def parse_args(cfg: dict[str, str]) -> argparse.Namespace:
 
 # ─────────────────────────── Точка входа ──────────────────────────────────────
 def main() -> None:
-    cfg  = load_config()
-    args = parse_args(cfg)
+    cfg      = load_config()
+    logo_cfg = load_logo_config()
+    args     = parse_args(cfg)
 
     if args.list_styles:
         print("Доступные стили кота:\n")
@@ -813,6 +1010,7 @@ def main() -> None:
         info=info,
         no_art=args.no_art,
         no_color=args.no_color,
+        logo_cfg=logo_cfg,
     )
 
 

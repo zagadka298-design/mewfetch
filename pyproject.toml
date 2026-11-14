@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mewfetch"
+version = "2.1.0"
+description = "A lightweight, customizable system info fetch tool with a cat aesthetic"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "zagadka298-design", email = "zagadka298@gmail.com"},
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Environment :: Console",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Utilities",
+]
+
+[project.optional-dependencies]
+image = ["term-image>=0.7"]
+
+[project.urls]
+Homepage = "https://github.com/zagadka298-design/mewfetch"
+Repository = "https://github.com/zagadka298-design/mewfetch"
+Issues = "https://github.com/zagadka298-design/mewfetch/issues"
+
+[project.scripts]
+mewfetch = "mewfetch:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mewfetch*"]

@@ -31,6 +31,7 @@
 - **4 стиля ASCII-кота** — classic, small, sleeping, box
 - **Полноценный CLI** — `--style`, `--theme`, `--fields`, `--json` и другие
 - **Конфиг файл** — сохрани настройки в `~/.config/mewfetch/config`
+- **Пользовательский логотип** — ASCII-арт или PNG/JPG через `~/.config/mewfetch/config.json`
 - **Поддержка Wayland и X11** — разрешение через `hyprctl` или `xrandr`
 - **JSON-вывод** — для использования в скриптах
 
@@ -143,6 +144,71 @@ mewfetch --style sleeping --theme cyan --save-config
 
 ---
 
+## 🖼️ Кастомный логотип (config.json)
+
+Помимо основного конфига, mewfetch читает `~/.config/mewfetch/config.json` для настройки логотипа/картинки слева от информации.
+
+Файл создаётся автоматически при первом запуске:
+
+```json
+{
+  "logo_path": "",
+  "logo_type": "ascii"
+}
+```
+
+### Параметры
+
+| Параметр    | Тип    | Значение по умолчанию | Описание |
+|-------------|--------|-----------------------|----------|
+| `logo_path` | string | `""`                  | Путь к файлу логотипа. Пустая строка → стандартный кот. Поддерживаются `~` и переменные окружения. |
+| `logo_type` | string | `"ascii"`             | Тип файла: `"ascii"` — текстовый арт, `"image"` — PNG/JPG. |
+
+### Пример 1: ASCII-арт из файла
+
+1. Создайте файл с артом, например `~/.config/mewfetch/mycat.txt`:
+   ```
+      /\_____/\
+     /  ^   ^  \
+    ( ==  v  == )
+     )   mew   (
+    (__(_____)__)
+   ```
+
+2. Укажите путь в `~/.config/mewfetch/config.json`:
+   ```json
+   {
+     "logo_path": "~/.config/mewfetch/mycat.txt",
+     "logo_type": "ascii"
+   }
+   ```
+
+### Пример 2: PNG/JPG изображение
+
+```json
+{
+  "logo_path": "~/Pictures/mylogo.png",
+  "logo_type": "image"
+}
+```
+
+> [!IMPORTANT]
+> Для отображения изображений поддерживаются два бэкенда:
+> - **Kitty Graphics Protocol** — работает автоматически в терминале [kitty](https://sw.kovidgoyal.net/kitty/)
+> - **term-image** — универсальная библиотека для других терминалов (установка: `pip install term-image`)
+
+```bash
+# Установить поддержку изображений
+pip install term-image
+# или
+pip install "mewfetch[image]"
+```
+
+> [!NOTE]
+> Если файл по указанному `logo_path` не найден, mewfetch автоматически выведет стандартного кота и покажет предупреждение в stderr.
+
+---
+
 ## 🎨 Темы и стили
 
 ### Темы (`--theme`)
@@ -168,12 +234,13 @@ mewfetch --style sleeping --theme cyan --save-config
 ## 🔧 Зависимости
 
 | Зависимость | Обязательная | Назначение |
-|-------------|:---:|-----------|
+|-------------|:---:|-----------| 
 | **Python 3.10+** | ✅ | Интерпретатор |
 | `lspci` | ⬜ | Информация о GPU |
 | `hyprctl` | ⬜ | Разрешение на Hyprland |
 | `xrandr` | ⬜ | Разрешение на X11 |
 | `gsettings` | ⬜ | GTK-тема и шрифт |
+| `term-image` | ⬜ | Вывод PNG/JPG логотипа (`pip install term-image`) |
 
 > Все основные данные считываются напрямую из `/proc` и `/etc` — без лишних пакетов.
 
