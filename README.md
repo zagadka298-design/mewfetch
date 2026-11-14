@@ -202,19 +202,16 @@ mewfetch --style sleeping --theme cyan --save-config
 ```
 
 > [!IMPORTANT]
-> Для отображения изображений поддерживаются два бэкенда:
-> - **Kitty Graphics Protocol** — работает автоматически в терминале [kitty](https://sw.kovidgoyal.net/kitty/)
-> - **term-image** — универсальная библиотека для других терминалов (установка: `pip install term-image`)
-
-```bash
-# Установить поддержку изображений
-pip install term-image
-# или
-pip install "mewfetch[image]"
-```
+> Для отображения PNG/JPG изображений используется библиотека **term-image**.
+> Установите её:
+> ```bash
+> pip install term-image
+> # или для Arch Linux через pacman:
+> sudo pacman -S python-term-image
+> ```
 
 > [!NOTE]
-> Если файл по указанному `logo_path` не найден, mewfetch автоматически выведет стандартного кота и покажет предупреждение в stderr.
+> Если библиотека `term-image` не установлена или файл по указанному `logo_path` не найден, mewfetch выведет предупреждение в stderr и автоматически отобразит стандартного ASCII-кота.
 
 ---
 

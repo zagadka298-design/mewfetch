@@ -696,93 +696,47 @@ def load_ascii_logo(path: str) -> list[str] | None:
         return None
 
 
-def _try_kitty_image(path: str) -> bool:
-    """Пробует вывести изображение через Kitty Graphics Protocol (APC-последовательность).
-
-    Возвращает True, если вывод, вероятно, сработал (терминал Kitty активен).
-    """
-    if not os.environ.get("KITTY_WINDOW_ID"):
-        return False
-    full = _expand(path)
-    if not os.path.isfile(full):
-        return False
-    try:
-        import base64
-        import struct
-        import zlib
-
-        with open(full, "rb") as f:
-            raw = f.read()
-
-        # Простая передача через APC без сжатия (формат Kitty: a=T,f=100 для PNG)
-        # Kitty принимает base64-закодированные данные порциями до 4096 байт
-        encoded = base64.standard_b64encode(raw).decode("ascii")
-        chunk_size = 4096
-        chunks = [encoded[i : i + chunk_size] for i in range(0, len(encoded), chunk_size)]
-
-        for idx, chunk in enumerate(chunks):
-            is_last = idx == len(chunks) - 1
-            m = 0 if is_last else 1
-            if idx == 0:
-                payload = f"\x1b_Ga=T,f=100,m={m};{chunk}\x1b\\"
-            else:
-                payload = f"\x1b_Gm={m};{chunk}\x1b\\"
-            sys.stdout.write(payload)
-            sys.stdout.flush()
-
-        sys.stdout.write("\n")
-        sys.stdout.flush()
-        return True
-    except Exception:
-        return False
-
-
-def _try_term_image(path: str) -> bool:
-    """Пробует вывести изображение через библиотеку term-image.
-
-    Возвращает True при успехе.
-    """
-    full = _expand(path)
-    if not os.path.isfile(full):
-        return False
-    try:
-        from term_image.image import AutoImage  # type: ignore
-
-        img = AutoImage(full)
-        img.draw()
-        return True
-    except ImportError:
-        return False
-    except Exception:
-        return False
-
-
 def render_image_logo(path: str) -> bool:
-    """Выводит изображение любым доступным методом.
+    """Выводит изображение в терминале с помощью term-image.
 
-    Порядок попыток: Kitty → term-image.
-    Возвращает True при успехе, False если ни один метод не сработал.
+    - Если файл не найден: выводит ошибку с указанием пути.
+    - Если term-image не установлен: выводит понятную ошибку (pip install term-image).
+    - При успехе рендерит PNG/JPG через term-image и возвращает True.
+    - При любой ошибке возвращает False (программа переключается на ASCII-кота).
     """
     full = _expand(path)
     if not os.path.isfile(full):
         print(
-            f"⚠️  mewfetch: файл изображения не найден: {path!r} — используется стандартный кот.",
+            f"⚠️  mewfetch: файл изображения не найден по пути: '{path}' (полный путь: '{full}')",
             file=sys.stderr,
         )
         return False
 
-    if _try_kitty_image(path):
-        return True
-    if _try_term_image(path):
-        return True
+    try:
+        from term_image.image import from_file
+    except ImportError:
+        print(
+            "⚠️  mewfetch: библиотека term-image не установлена!\n"
+            "   Установите term-image: pip install term-image\n"
+            "   Переключение на стандартного ASCII-кота...",
+            file=sys.stderr,
+        )
+        return False
 
-    print(
-        "⚠️  mewfetch: не удалось отобразить изображение. "
-        "Установите term-image (`pip install term-image`) или используйте терминал Kitty. "
-        "Используется стандартный кот.",
-        file=sys.stderr,
-    )
-    return False
+    try:
+        img = from_file(full)
+        try:
+            img.height = 18
+        except Exception:
+            pass
+        img.draw()
+        return True
+    except Exception as e:
+        print(
+            f"⚠️  mewfetch: ошибка при рендере изображения через term-image: {e}",
+            file=sys.stderr,
+        )
+        return False
 
 
 def save_config(args: argparse.Namespace) -> None:
