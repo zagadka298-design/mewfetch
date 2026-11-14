@@ -445,7 +445,7 @@ def get_theme() -> str:
     out = run(["gsettings", "get", "org.gnome.desktop.interface", "gtk-theme"])
     if out:
         return out.strip("'\"")
-    gtk3 = Path.home() / ".config" / "gtk-3.0" / "settings.ini"
+    gtk3 = Path(os.path.expanduser("~/.config/gtk-3.0/settings.ini"))
     if gtk3.exists():
         try:
             with open(gtk3) as f:
@@ -462,7 +462,7 @@ def get_font() -> str:
     out = run(["gsettings", "get", "org.gnome.desktop.interface", "font-name"])
     if out:
         return out.strip("'\"")
-    hypr = Path.home() / ".config" / "hypr" / "hyprland.conf"
+    hypr = Path(os.path.expanduser("~/.config/hypr/hyprland.conf"))
     if hypr.exists():
         try:
             with open(hypr) as f:
@@ -539,7 +539,7 @@ def gather_info(
 
 # ─────────────────────────── Конфиг файл ──────────────────────────────────────
 xdg_config      = os.environ.get("XDG_CONFIG_HOME")
-CONFIG_DIR      = Path(xdg_config) / "mewfetch" if xdg_config else Path.home() / ".config" / "mewfetch"
+CONFIG_DIR      = Path(xdg_config) / "mewfetch" if xdg_config else Path(os.path.expanduser("~/.config/mewfetch"))
 CONFIG_PATH     = CONFIG_DIR / "config"
 CONFIG_JSON     = CONFIG_DIR / "config.json"
 _DEFAULTS       = {
@@ -707,13 +707,16 @@ def visible_len(s: str) -> int:
     return sum(2 if unicodedata.east_asian_width(c) in ("W", "F") else 1 for c in clean)
 
 
-def load_image_logo(path: str, max_height: int = 18) -> list[str] | None:
-    """Загружает и конвертирует изображение в список строк для терминала с помощью term-image.
+def render_image_logo(path: str, info_lines: list[str]) -> bool:
+    """Выводит изображение с помощью term-image с адаптивным разрешением и защитой от переполнения.
 
-    - Если файл не найден: выводит ошибку с указанием пути и возвращает None.
-    - Если term-image не установлен: выводит понятную ошибку (pip install term-image) и возвращает None.
-    - При успехе возвращает список строк (ANSI/Unicode-блоков) для бокового вывода справа.
-    - При любой другой ошибке выводит сообщение и возвращает None.
+    - Ограничение img.height = 18 убрано: размер рассчитывается динамически под разрешение терминала.
+    - Приоритет отдаётся нативному протоколу терминала (Kitty/iTerm2) с падением на direct-color BlockImage.
+    - При нехватке места:
+        * ширина < 40 или высота < 15 строк (или не влезает сбоку): картинка уменьшается (до 50%) и выводится СВЕРХУ.
+        * ширина < 35 или высота < 10 строк: картинка отключается, выводится только текст.
+        * достаточно места: картинка выводится СПРАВА с максимальным доступным разрешением.
+    - Если term-image не установлен или файл не найден: вывод ошибки в stderr и возврат False (фоллбэк на ASCII-кота).
     """
     full = _expand(path)
     if not os.path.isfile(full):
@@ -721,10 +724,28 @@ def load_image_logo(path: str, max_height: int = 18) -> list[str] | None:
             f"⚠️  mewfetch: файл изображения не найден по пути: '{path}' (полный путь: '{full}')",
             file=sys.stderr,
         )
-        return None
+        return False
 
     try:
-        from term_image.image import BlockImage
+        import term_image
+        from term_image.image import from_file, KittyImage
+
+        # Настраиваем динамический масштаб ячейки терминала для правильных пропорций
+        try:
+            term_image.set_cell_ratio(term_image.AutoCellRatio.DYNAMIC)
+        except Exception:
+            pass
+
+        # Настраиваем поддержку Kitty Graphics Protocol без утечки escape-последовательностей
+        is_kitty = bool(os.environ.get("KITTY_WINDOW_ID") or os.environ.get("TERM") == "xterm-kitty")
+        if is_kitty:
+            try:
+                KittyImage._supported = True
+                KittyImage.forced_support = True
+            except Exception:
+                pass
+        else:
+            KittyImage._supported = False
     except ImportError:
         print(
             "⚠️  mewfetch: библиотека term-image не установлена!\n"
@@ -732,26 +753,72 @@ def load_image_logo(path: str, max_height: int = 18) -> list[str] | None:
             "   Переключение на стандартного ASCII-кота...",
             file=sys.stderr,
         )
-        return None
+        return False
 
     try:
-        img = BlockImage.from_file(full)
-        target_h = max(10, min(max_height, 22))
-        img.height = target_h
-
-        # Подгоняем ширину картинки под оставшееся место в окне терминала справа
-        term_cols = shutil.get_terminal_size((80, 24)).columns
-        max_allowed_w = max(10, term_cols - 46)
-        if img.width > max_allowed_w:
-            img.width = max_allowed_w
-
-        return str(img).splitlines()
+        img = from_file(full)
+        if hasattr(img, "_render_methods") and "lines" in img._render_methods:
+            try:
+                img.set_render_method("lines")
+            except Exception:
+                pass
     except Exception as e:
         print(
-            f"⚠️  mewfetch: ошибка при рендере изображения через term-image: {e}",
+            f"⚠️  mewfetch: ошибка при загрузке изображения через term-image: {e}",
             file=sys.stderr,
         )
-        return None
+        return False
+
+    # ── Проверка размера терминала (адаптивная вёрстка под тайлинг и маленькие окна) ──
+    term_size = shutil.get_terminal_size((80, 24))
+    term_cols = term_size.columns
+    term_lines = term_size.lines
+    max_info_w = max((visible_len(line) for line in info_lines), default=0)
+    info_h = len(info_lines)
+
+    # 1. Если места совсем нет — отключаем картинку и выводим только текст
+    if term_cols < 35 or term_lines < 10:
+        for line in info_lines:
+            print(line)
+        return True
+
+    # 2. Если места не хватает для бокового вывода (ширина < 40 или высота < 15, или вбок не помещается)
+    # Перемещаем картинку НАВЕРХ, уменьшаем пропорционально (50% ширины), а инфо выводим ПОД ней
+    if term_cols < max_info_w + 20 or term_cols < 40 or term_lines < 15:
+        top_w = max(10, min(int(term_cols * 0.5), term_cols - 2))
+        top_h = max(4, min(14, max(term_lines - info_h - 2, 6)))
+        try:
+            img.set_size(height=top_h)
+            if img.width > top_w:
+                img.set_size(width=top_w)
+        except Exception:
+            pass
+
+        img_lines = str(img).splitlines()
+        for line in img_lines:
+            print(line)
+        for line in info_lines:
+            print(line)
+        return True
+
+    # 3. Достаточно места: адаптивный расчет под максимальное доступное разрешение справа
+    avail_w = max(15, term_cols - max_info_w - 4)
+    avail_h = max(info_h, min(term_lines - 2, 50))
+    try:
+        img.set_size(height=avail_h)
+        if img.width > avail_w:
+            img.set_size(width=avail_w)
+    except Exception:
+        pass
+
+    img_lines = str(img).splitlines()
+    rows = max(len(info_lines), len(img_lines))
+    for i in range(rows):
+        ip = info_lines[i] if i < len(info_lines) else ""
+        im = img_lines[i] if i < len(img_lines) else ""
+        pad = " " * (max_info_w - visible_len(ip))
+        print(f"{ip}{pad}   {im}")
+    return True
 
 
 def save_config(args: argparse.Namespace) -> None:
@@ -830,18 +897,10 @@ def render(
 
     if logo_path:
         if logo_type == "image":
-            # Для image-режима выводим изображение СПРАВА от системной информации
-            img_lines = load_image_logo(logo_path, max_height=len(info_lines))
-            if img_lines is not None:
-                max_info_w = max((visible_len(line) for line in info_lines), default=0)
-                rows = max(len(info_lines), len(img_lines))
-                for i in range(rows):
-                    ip = info_lines[i] if i < len(info_lines) else ""
-                    im = img_lines[i] if i < len(img_lines) else ""
-                    pad = " " * (max_info_w - visible_len(ip))
-                    print(f"{ip}{pad}   {im}")
+            # Выводим изображение через адаптивный рендерер (сбоку справа либо сверху при нехватке места)
+            if render_image_logo(logo_path, info_lines):
                 return
-            # Если не получилось — переключаемся на стандартного кота
+            # Если не получилось (нет файла / нет библиотеки) — переключаемся на стандартного кота
             logo_path = ""
         else:
             # ascii-режим: арт выводится слева, инфо справа
