@@ -534,38 +534,109 @@ def gather_info(
 xdg_config  = os.environ.get("XDG_CONFIG_HOME")
 CONFIG_DIR  = Path(xdg_config) / "mewfetch" if xdg_config else Path.home() / ".config" / "mewfetch"
 CONFIG_PATH = CONFIG_DIR / "config"
-_DEFAULTS   = {"style": "classic", "theme": "pink", "show_na": "false"}
+_DEFAULTS   = {
+    "style": "classic",
+    "theme": "pink",
+    "fields": "",
+    "show_na": "false",
+    "no_color": "false",
+    "no_art": "false",
+}
+
+DEFAULT_CONFIG_TEXT = """# mewfetch config
+# Расположение: ~/.config/mewfetch/config
+
+# Стиль ASCII-кота: classic, small, sleeping, box
+style = classic
+
+# Цветовая тема: pink, blue, green, red, cyan, mono
+theme = pink
+
+# Отображаемые поля через запятую (оставьте пустым для отображения всех)
+# Доступные: OS, Kernel, Hostname, Uptime, CPU, GPU, RAM, Swap, Disk,
+#            Resolution, WM, DE, Terminal, Shell, Packages, Battery, IP, Theme, Font
+# fields = OS, Kernel, Hostname, Uptime, CPU, GPU, RAM, Disk, Resolution, WM, DE, Terminal, Shell, Packages
+
+# Показывать поля со значением N/A (true / false)
+show_na = false
+
+# Отключить цвета (true / false)
+no_color = false
+
+# Отключить ASCII-арт кота (true / false)
+no_art = false
+"""
+
+
+def ensure_config_exists() -> None:
+    """Создаёт шаблонный конфиг файл, если он ещё не существует."""
+    try:
+        if not CONFIG_PATH.exists():
+            CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+            CONFIG_PATH.write_text(DEFAULT_CONFIG_TEXT, encoding="utf-8")
+    except OSError:
+        pass
+
+
+def to_bool(val: str | bool) -> bool:
+    if isinstance(val, bool):
+        return val
+    return str(val).strip().lower() in ("true", "1", "yes", "on")
 
 
 def load_config() -> dict[str, str]:
-    """Загружает конфиг (формат: key = value)."""
+    """Загружает конфиг (формат: key = value). Если файла нет — создаёт дефолтный."""
+    ensure_config_exists()
     cfg = dict(_DEFAULTS)
     if not CONFIG_PATH.exists():
         return cfg
     try:
-        with open(CONFIG_PATH) as f:
+        with open(CONFIG_PATH, encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
-                if not line or line.startswith("#"):
+                if not line or line.startswith("#") or line.startswith(";"):
+                    continue
+                # Удаляем inline комментарии
+                for sep in ("#", ";"):
+                    if sep in line:
+                        line = line.split(sep, 1)[0].strip()
+                if not line or "=" not in line:
                     continue
                 k, _, v = line.partition("=")
                 k = k.strip().lower()
+                v = v.strip().strip("'\"")
                 if k in cfg:
-                    cfg[k] = v.strip().strip("'\"")
+                    cfg[k] = v
     except OSError:
         pass
+
+    # Валидация стилей и тем
+    if cfg.get("style") not in CAT_STYLES:
+        cfg["style"] = _DEFAULTS["style"]
+    if cfg.get("theme") not in THEMES:
+        cfg["theme"] = _DEFAULTS["theme"]
+
     return cfg
 
 
 def save_config(args: argparse.Namespace) -> None:
     """Сохраняет текущие настройки в конфиг файл."""
-    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(CONFIG_PATH, "w") as f:
-        f.write("# mewfetch config — создан автоматически\n")
-        f.write(f"style   = {args.style}\n")
-        f.write(f"theme   = {args.theme}\n")
-        f.write(f"show_na = {'true' if args.show_na else 'false'}\n")
-    print(f"✅ Конфиг сохранён: {CONFIG_PATH}")
+    try:
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+            f.write("# mewfetch config — создан автоматически\n")
+            f.write(f"style    = {args.style}\n")
+            f.write(f"theme    = {args.theme}\n")
+            if args.fields:
+                f.write(f"fields   = {args.fields}\n")
+            else:
+                f.write("# fields = OS, Kernel, Hostname, Uptime, CPU, GPU, RAM, Disk\n")
+            f.write(f"show_na  = {'true' if args.show_na else 'false'}\n")
+            f.write(f"no_color = {'true' if args.no_color else 'false'}\n")
+            f.write(f"no_art   = {'true' if args.no_art else 'false'}\n")
+        print(f"✅ Конфиг сохранён: {CONFIG_PATH}")
+    except OSError as e:
+        print(f"❌ Ошибка сохранения конфига: {e}", file=sys.stderr)
 
 
 # ─────────────────────────── Форматирование ───────────────────────────────────
@@ -651,15 +722,35 @@ def parse_args(cfg: dict[str, str]) -> argparse.Namespace:
         "--theme", default=cfg["theme"], choices=list(THEMES), metavar="THEME",
         help=f"Цветовая тема (по умолчанию: {cfg['theme']})",
     )
-    p.add_argument("--no-color",    action="store_true", help="Отключить цвета")
-    p.add_argument("--no-art",      action="store_true", help="Без ASCII-арта")
     p.add_argument(
-        "--show-na", action="store_true",
-        default=cfg.get("show_na", "false").lower() == "true",
+        "--no-color", dest="no_color", action="store_true",
+        default=to_bool(cfg.get("no_color", "false")),
+        help="Отключить цвета",
+    )
+    p.add_argument(
+        "--color", dest="no_color", action="store_false",
+        help="Включить цвета",
+    )
+    p.add_argument(
+        "--no-art", dest="no_art", action="store_true",
+        default=to_bool(cfg.get("no_art", "false")),
+        help="Без ASCII-арта",
+    )
+    p.add_argument(
+        "--art", dest="no_art", action="store_false",
+        help="С ASCII-артом",
+    )
+    p.add_argument(
+        "--show-na", dest="show_na", action="store_true",
+        default=to_bool(cfg.get("show_na", "false")),
         help="Показывать поля со значением N/A",
     )
     p.add_argument(
-        "--fields", metavar="ПОЛЕ,...",
+        "--hide-na", dest="show_na", action="store_false",
+        help="Скрывать поля со значением N/A",
+    )
+    p.add_argument(
+        "--fields", default=cfg.get("fields", ""), metavar="ПОЛЕ,...",
         help="Выбрать конкретные поля через запятую (например: OS,CPU,RAM)",
     )
     p.add_argument("--json",        action="store_true", help="Вывод в формате JSON")
@@ -694,8 +785,9 @@ def main() -> None:
         return
 
     # Выбор полей
-    if args.fields:
-        wanted = {f.strip().lower() for f in args.fields.split(",") if f.strip()}
+    fields_str = args.fields or cfg.get("fields", "")
+    if fields_str:
+        wanted = {f.strip().lower() for f in fields_str.split(",") if f.strip()}
         fields = [(l, f) for l, f in ALL_FIELDS if l.lower() in wanted]
         if not fields:
             print(

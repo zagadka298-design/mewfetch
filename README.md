@@ -124,16 +124,19 @@ mewfetch --list-themes
 
 ## ⚙️ Конфиг файл
 
-Настройки хранятся в `~/.config/mewfetch/config`:
+Настройки хранятся в `~/.config/mewfetch/config` (создаётся автоматически при первом запуске):
 
 ```ini
 # mewfetch config
-style   = classic
-theme   = pink
-show_na = false
+style    = classic
+theme    = pink
+# fields = OS, CPU, RAM, GPU
+show_na  = false
+no_color = false
+no_art   = false
 ```
 
-Быстрое создание через CLI:
+Быстрое сохранение настроек через CLI:
 ```bash
 mewfetch --style sleeping --theme cyan --save-config
 ```
