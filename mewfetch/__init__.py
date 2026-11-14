@@ -21,12 +21,14 @@ import argparse
 import json
 import os
 import platform
+import re
 import shutil
 import socket
 import subprocess
 import sys
 import threading
 import time
+import unicodedata
 from pathlib import Path
 from typing import Callable
 
@@ -696,13 +698,22 @@ def load_ascii_logo(path: str) -> list[str] | None:
         return None
 
 
-def render_image_logo(path: str) -> bool:
-    """Выводит изображение в терминале с помощью term-image.
+ANSI_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
 
-    - Если файл не найден: выводит ошибку с указанием пути.
-    - Если term-image не установлен: выводит понятную ошибку (pip install term-image).
-    - При успехе рендерит PNG/JPG через term-image и возвращает True.
-    - При любой ошибке возвращает False (программа переключается на ASCII-кота).
+
+def visible_len(s: str) -> int:
+    """Вычисляет реальную видимую ширину строки в терминале без ANSI-кодов и с учётом wide-символов."""
+    clean = ANSI_RE.sub("", s)
+    return sum(2 if unicodedata.east_asian_width(c) in ("W", "F") else 1 for c in clean)
+
+
+def load_image_logo(path: str, max_height: int = 18) -> list[str] | None:
+    """Загружает и конвертирует изображение в список строк для терминала с помощью term-image.
+
+    - Если файл не найден: выводит ошибку с указанием пути и возвращает None.
+    - Если term-image не установлен: выводит понятную ошибку (pip install term-image) и возвращает None.
+    - При успехе возвращает список строк (ANSI/Unicode-блоков) для бокового вывода справа.
+    - При любой другой ошибке выводит сообщение и возвращает None.
     """
     full = _expand(path)
     if not os.path.isfile(full):
@@ -710,10 +721,10 @@ def render_image_logo(path: str) -> bool:
             f"⚠️  mewfetch: файл изображения не найден по пути: '{path}' (полный путь: '{full}')",
             file=sys.stderr,
         )
-        return False
+        return None
 
     try:
-        from term_image.image import from_file
+        from term_image.image import BlockImage
     except ImportError:
         print(
             "⚠️  mewfetch: библиотека term-image не установлена!\n"
@@ -721,22 +732,26 @@ def render_image_logo(path: str) -> bool:
             "   Переключение на стандартного ASCII-кота...",
             file=sys.stderr,
         )
-        return False
+        return None
 
     try:
-        img = from_file(full)
-        try:
-            img.height = 18
-        except Exception:
-            pass
-        img.draw()
-        return True
+        img = BlockImage.from_file(full)
+        target_h = max(10, min(max_height, 22))
+        img.height = target_h
+
+        # Подгоняем ширину картинки под оставшееся место в окне терминала справа
+        term_cols = shutil.get_terminal_size((80, 24)).columns
+        max_allowed_w = max(10, term_cols - 46)
+        if img.width > max_allowed_w:
+            img.width = max_allowed_w
+
+        return str(img).splitlines()
     except Exception as e:
         print(
             f"⚠️  mewfetch: ошибка при рендере изображения через term-image: {e}",
             file=sys.stderr,
         )
-        return False
+        return None
 
 
 def save_config(args: argparse.Namespace) -> None:
@@ -809,21 +824,27 @@ def render(
             print(line)
         return
 
-    # ── Определяем источник левой колонки (логотип) ───────────────────────────
+    # ── Определяем источник логотипа ──────────────────────────────────────────
     logo_path = (logo_cfg or {}).get("logo_path", "").strip()
     logo_type = (logo_cfg or {}).get("logo_type", "ascii")
 
     if logo_path:
         if logo_type == "image":
-            # Для image-режима выводим изображение отдельно, затем инфо
-            if render_image_logo(logo_path):
-                for line in info_lines:
-                    print(line)
+            # Для image-режима выводим изображение СПРАВА от системной информации
+            img_lines = load_image_logo(logo_path, max_height=len(info_lines))
+            if img_lines is not None:
+                max_info_w = max((visible_len(line) for line in info_lines), default=0)
+                rows = max(len(info_lines), len(img_lines))
+                for i in range(rows):
+                    ip = info_lines[i] if i < len(info_lines) else ""
+                    im = img_lines[i] if i < len(img_lines) else ""
+                    pad = " " * (max_info_w - visible_len(ip))
+                    print(f"{ip}{pad}   {im}")
                 return
-            # Если не получилось — падаем на стандартного кота
+            # Если не получилось — переключаемся на стандартного кота
             logo_path = ""
         else:
-            # ascii-режим
+            # ascii-режим: арт выводится слева, инфо справа
             custom_lines = load_ascii_logo(logo_path)
             if custom_lines is not None:
                 cat       = custom_lines
@@ -835,7 +856,7 @@ def render(
                     ip = info_lines[i] if i < len(info_lines) else ""
                     print(f"{cat_color}{cp:<{cat_width}}{reset}  {ip}")
                 return
-            # Файл не найден — стандартный кот (logo_path уже сброшен ниже)
+            # Файл не найден — переключаемся на стандартного кота
 
     # ── Стандартный ASCII-кот ─────────────────────────────────────────────────
     cat       = CAT_STYLES.get(style, CAT_STYLES["classic"])
