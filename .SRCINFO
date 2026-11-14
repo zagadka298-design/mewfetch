@@ -1,0 +1,12 @@
+pkgbase = mewfetch
+	pkgdesc = Lightweight system info fetch tool for Linux with ASCII cat art
+	pkgver = 2.0.0
+	pkgrel = 1
+	url = https://github.com/zagadka298-design/mewfetch
+	arch = any
+	license = MIT
+	depends = python
+	source = mewfetch-2.0.0.tar.gz::https://github.com/zagadka298-design/mewfetch/archive/refs/heads/main.tar.gz
+	sha256sums = 837bbddbc6af055127e253130f6a6d2f73bdf87a8c882639809381e965e57f4e
+
+pkgname = mewfetch
