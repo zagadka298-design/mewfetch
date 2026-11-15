@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 """
-mewfetch v2.1.0 — система информации с ASCII-котом 🐱
-Нулевые зависимости · Параллельный сбор · Полностью настраиваемый
+mewfetch v2.1.0 — system information tool with an ASCII cat 🐱
+Zero dependencies · Concurrent data fetching · Fully customizable
 
-Новое в v2.0:
-  · 8 новых полей: GPU, Disk, Swap, Packages, Battery, IP, Theme, Font
-  · Параллельный сбор данных (threading) — быстрее на 70%
-  · 6 цветовых тем (pink, blue, green, red, cyan, mono)
-  · 4 стиля ASCII-кота (classic, small, sleeping, box)
+What's new in v2.0:
+  · 8 new fields: GPU, Disk, Swap, Packages, Battery, IP, Theme, Font
+  · Concurrent data collection (threading) — 70% faster
+  · 6 color themes (pink, blue, green, red, cyan, mono)
+  · 4 cat ASCII art styles (classic, small, sleeping, box)
   · CLI: --style, --theme, --fields, --no-color, --no-art, --json, --save-config
-  · Конфиг файл: ~/.config/mewfetch/config
+  · Config file: ~/.config/mewfetch/config
 
-Новое в v2.1:
-  · Поддержка пользовательского логотипа через config.json
-  · logo_path: путь к файлу с ASCII-артом или изображением
-  · logo_type: "ascii" (текстовый арт) или "image" (PNG/JPG через term-image или Kitty)
+What's new in v2.1:
+  · Custom logo support via config.json
+  · logo_path: path to ASCII art or image file
+  · logo_type: "ascii" (text art) or "image" (PNG/JPG via term-image or Kitty)
 """
 
 import argparse
@@ -35,7 +35,7 @@ from typing import Callable
 VERSION = "2.1.0"
 RESET = "\033[0m"
 
-# ─────────────────────────── Цветовые темы ────────────────────────────────────
+# ─────────────────────────── Color themes ─────────────────────────────────────
 THEMES: dict[str, dict[str, str]] = {
     "pink":  {"cat": "\033[1;35m", "label": "\033[1;35m", "value": "\033[1;37m", "border": "\033[0;37m", "user": "\033[1;36m"},
     "blue":  {"cat": "\033[1;34m", "label": "\033[1;34m", "value": "\033[1;37m", "border": "\033[0;37m", "user": "\033[1;36m"},
@@ -45,7 +45,7 @@ THEMES: dict[str, dict[str, str]] = {
     "mono":  {"cat": "\033[1m",    "label": "\033[1m",    "value": "\033[0m",    "border": "\033[0m",    "user": "\033[1m"},
 }
 
-# ─────────────────────────── ASCII-стили ──────────────────────────────────────
+# ─────────────────────────── ASCII styles ─────────────────────────────────────
 CAT_STYLES: dict[str, list[str]] = {
     "classic": [
         r"   /\_____/\   ",
@@ -100,9 +100,9 @@ CAT_STYLES: dict[str, list[str]] = {
     ],
 }
 
-# ─────────────────────────── Вспомогательная функция ──────────────────────────
+# ─────────────────────────── Helper functions ─────────────────────────────────
 def run(cmd: list[str], timeout: int = 3) -> str | None:
-    """Запускает внешнюю команду, возвращает stdout или None."""
+    """Runs an external command, returns stdout or None."""
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
         out = r.stdout.strip()
@@ -111,7 +111,7 @@ def run(cmd: list[str], timeout: int = 3) -> str | None:
         return None
 
 
-# ─────────────────────────── Сборщики данных ──────────────────────────────────
+# ─────────────────────────── Data Collectors ──────────────────────────────────
 def get_os() -> str:
     try:
         with open("/etc/os-release") as f:
@@ -141,9 +141,9 @@ def get_uptime() -> str:
         h = int((seconds % 86400) // 3600)
         m = int((seconds % 3600) // 60)
         parts = []
-        if d: parts.append(f"{d}д")
-        if h: parts.append(f"{h}ч")
-        parts.append(f"{m}мин")
+        if d: parts.append(f"{d}d")
+        if h: parts.append(f"{h}h")
+        parts.append(f"{m}m")
         return " ".join(parts)
     except OSError:
         return "N/A"
@@ -164,7 +164,7 @@ def get_cpu() -> str:
 
 
 def get_gpu() -> str:
-    """Определяет GPU через lspci или DRM."""
+    """Detects GPU via lspci or DRM."""
     if shutil.which("lspci"):
         out = run(["lspci", "-mm"])
         if out:
@@ -191,7 +191,7 @@ def get_gpu() -> str:
 
 
 def _meminfo() -> dict[str, str]:
-    """Вспомогательная: читает /proc/meminfo в словарь."""
+    """Helper: reads /proc/meminfo into a dictionary."""
     data: dict[str, str] = {}
     with open("/proc/meminfo") as f:
         for line in f:
@@ -227,7 +227,7 @@ def get_swap() -> str:
 
 
 def get_disk() -> str:
-    """Использование корневого раздела (/)."""
+    """Root partition (/) disk usage."""
     try:
         st    = os.statvfs("/")
         total = st.f_blocks * st.f_frsize
@@ -260,7 +260,7 @@ def get_resolution() -> str:
             except (json.JSONDecodeError, KeyError):
                 pass
 
-    # 2. xrandr — все подключённые мониторы
+    # 2. xrandr — all connected monitors
     if shutil.which("xrandr"):
         out = run(["xrandr"])
         if out:
@@ -299,7 +299,7 @@ def get_wm() -> str:
     if os.environ.get("HYPRLAND_INSTANCE_SIGNATURE"):
         return "Hyprland"
 
-    # Поиск по процессам — точнее, чем XDG_CURRENT_DESKTOP
+    # Process search — more reliable than XDG_CURRENT_DESKTOP
     known = [
         "hyprland", "sway", "i3", "openbox", "bspwm", "dwm",
         "xmonad", "awesome", "fluxbox", "kwin_wayland", "mutter",
@@ -312,19 +312,19 @@ def get_wm() -> str:
             if wm in running:
                 return wm.capitalize()
 
-    # Запасной вариант: переменная среды (может быть DE, а не WM)
+    # Fallback: environment variable (may be DE rather than WM)
     desktop = os.environ.get("XDG_CURRENT_DESKTOP", "")
     return desktop or "N/A"
 
 
 def get_de() -> str:
-    """Desktop Environment — отдельно от WM."""
+    """Desktop Environment — separate from WM."""
     de = os.environ.get("XDG_CURRENT_DESKTOP", "")
     return de or os.environ.get("DESKTOP_SESSION", "") or "N/A"
 
 
 def get_terminal() -> str:
-    # 1. Специфичные переменные окружения
+    # 1. Specific environment variables
     if prog := os.environ.get("TERM_PROGRAM"):
         return prog
     if os.environ.get("KITTY_WINDOW_ID"):
@@ -340,7 +340,7 @@ def get_terminal() -> str:
     if os.environ.get("GHOSTTY_RESOURCES_DIR"):
         return "ghostty"
 
-    # 2. Поиск по дереву процессов (родители текущего процесса)
+    # 2. Process tree traversal (parents of current process)
     shells = {"bash", "zsh", "fish", "sh", "dash", "tcsh", "csh", "python", "python3"}
     try:
         pid = os.getppid()
@@ -352,7 +352,7 @@ def get_terminal() -> str:
             comm = comm_file.read_text().strip()
             if comm.lower() not in shells and comm:
                 return comm
-            # Читаем parent pid из /proc/[pid]/stat (4-е поле после comm в скобках)
+            # Read parent pid from /proc/[pid]/stat (4th field after comm in parentheses)
             content = stat_file.read_text()
             rparen = content.rfind(")")
             if rparen != -1:
@@ -372,7 +372,7 @@ def get_shell() -> str:
 
 
 def get_packages() -> str:
-    """Количество пакетов по каждому менеджеру пакетов."""
+    """Number of packages for each supported package manager."""
     managers = [
         (["pacman", "-Qq", "--color=never"], "pacman", 0),
         (["dpkg",   "--get-selections"],     "dpkg",   0),
@@ -394,7 +394,7 @@ def get_packages() -> str:
 
 
 def get_battery() -> str:
-    """Статус батареи из /sys/class/power_supply."""
+    """Battery status from /sys/class/power_supply."""
     supply = Path("/sys/class/power_supply")
     if not supply.exists():
         return "N/A"
@@ -424,7 +424,7 @@ def get_battery() -> str:
 
 
 def get_local_ip() -> str:
-    """Локальный IPv4-адрес без вызова внешних утилит."""
+    """Local IPv4 address without invoking external utilities."""
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.connect(("1.1.1.1", 80))
@@ -441,7 +441,7 @@ def get_local_ip() -> str:
 
 
 def get_theme() -> str:
-    """GTK-тема (gsettings или ~/.config/gtk-3.0/settings.ini)."""
+    """GTK theme (gsettings or ~/.config/gtk-3.0/settings.ini)."""
     out = run(["gsettings", "get", "org.gnome.desktop.interface", "gtk-theme"])
     if out:
         return out.strip("'\"")
@@ -458,7 +458,7 @@ def get_theme() -> str:
 
 
 def get_font() -> str:
-    """Системный шрифт (gsettings или Hyprland config)."""
+    """System font (gsettings or Hyprland config)."""
     out = run(["gsettings", "get", "org.gnome.desktop.interface", "font-name"])
     if out:
         return out.strip("'\"")
@@ -475,7 +475,7 @@ def get_font() -> str:
     return "N/A"
 
 
-# ─────────────────────────── Список всех полей ────────────────────────────────
+# ─────────────────────────── Field list ───────────────────────────────────────
 ALL_FIELDS: list[tuple[str, Callable[[], str]]] = [
     ("OS",         get_os),
     ("Kernel",     get_kernel),
@@ -501,12 +501,12 @@ ALL_FIELDS: list[tuple[str, Callable[[], str]]] = [
 FIELD_NAMES = [name for name, _ in ALL_FIELDS]
 
 
-# ─────────────────────────── Параллельный сбор ────────────────────────────────
+# ─────────────────────────── Concurrent data gathering ────────────────────────
 def gather_info(
     fields: list[tuple[str, Callable[[], str]]],
     show_na: bool,
 ) -> list[tuple[str, str]]:
-    """Запускает все геттеры параллельно в отдельных потоках с общим таймаутом."""
+    """Runs all getters concurrently in separate threads with an overall timeout."""
     results: dict[str, str] = {}
     lock = threading.Lock()
 
@@ -537,7 +537,7 @@ def gather_info(
     ]
 
 
-# ─────────────────────────── Конфиг файл ──────────────────────────────────────
+# ─────────────────────────── Configuration File ───────────────────────────────
 xdg_config      = os.environ.get("XDG_CONFIG_HOME")
 CONFIG_DIR      = Path(xdg_config) / "mewfetch" if xdg_config else Path(os.path.expanduser("~/.config/mewfetch"))
 CONFIG_PATH     = CONFIG_DIR / "config"
@@ -556,49 +556,49 @@ _JSON_DEFAULTS = {
 }
 
 DEFAULT_CONFIG_TEXT = """# mewfetch config
-# Расположение: ~/.config/mewfetch/config
+# Location: ~/.config/mewfetch/config
 
-# Стиль ASCII-кота: classic, small, sleeping, box
+# Cat ASCII art style: classic, small, sleeping, box
 style = classic
 
-# Цветовая тема: pink, blue, green, red, cyan, mono
+# Color theme: pink, blue, green, red, cyan, mono
 theme = pink
 
-# Отображаемые поля через запятую (оставьте пустым для отображения всех)
-# Доступные: OS, Kernel, Hostname, Uptime, CPU, GPU, RAM, Swap, Disk,
+# Comma-separated list of displayed fields (leave empty to show all)
+# Available: OS, Kernel, Hostname, Uptime, CPU, GPU, RAM, Swap, Disk,
 #            Resolution, WM, DE, Terminal, Shell, Packages, Battery, IP, Theme, Font
 # fields = OS, Kernel, Hostname, Uptime, CPU, GPU, RAM, Disk, Resolution, WM, DE, Terminal, Shell, Packages
 
-# Показывать поля со значением N/A (true / false)
+# Show fields with N/A values (true / false)
 show_na = false
 
-# Отключить цвета (true / false)
+# Disable colors (true / false)
 no_color = false
 
-# Отключить ASCII-арт кота (true / false)
+# Disable cat ASCII art (true / false)
 no_art = false
 """
 
 
 def ensure_config_exists() -> None:
-    """Создаёт директорию конфига, INI-конфиг и config.json, если их ещё нет.
+    """Creates config directory, INI config, and config.json if they do not exist.
 
-    Каждый файл создаётся независимо — ошибка одного не блокирует другой.
+    Each file is created independently — an error with one does not block the other.
     """
-    # 1. Директория
+    # 1. Directory
     try:
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     except OSError:
-        return  # Если директорию создать нельзя — дальше смысла нет
+        return  # Cannot create config directory
 
-    # 2. INI-конфиг (style, theme, …)
+    # 2. INI config (style, theme, …)
     try:
         if not CONFIG_PATH.exists():
             CONFIG_PATH.write_text(DEFAULT_CONFIG_TEXT, encoding="utf-8")
     except OSError:
         pass
 
-    # 3. JSON-конфиг (logo_path, logo_type)
+    # 3. JSON config (logo_path, logo_type)
     try:
         if not CONFIG_JSON.exists():
             CONFIG_JSON.write_text(
@@ -616,7 +616,7 @@ def to_bool(val: str | bool) -> bool:
 
 
 def load_config() -> dict[str, str]:
-    """Загружает конфиг (формат: key = value). Если файла нет — создаёт дефолтный."""
+    """Loads config (format: key = value). Creates default file if missing."""
     ensure_config_exists()
     cfg = dict(_DEFAULTS)
     if not CONFIG_PATH.exists():
@@ -627,7 +627,7 @@ def load_config() -> dict[str, str]:
                 line = line.strip()
                 if not line or line.startswith("#") or line.startswith(";"):
                     continue
-                # Удаляем inline комментарии
+                # Strip inline comments
                 for sep in ("#", ";"):
                     if sep in line:
                         line = line.split(sep, 1)[0].strip()
@@ -641,7 +641,7 @@ def load_config() -> dict[str, str]:
     except OSError:
         pass
 
-    # Валидация стилей и тем
+    # Validate styles and themes
     if cfg.get("style") not in CAT_STYLES:
         cfg["style"] = _DEFAULTS["style"]
     if cfg.get("theme") not in THEMES:
@@ -651,11 +651,11 @@ def load_config() -> dict[str, str]:
 
 
 def load_logo_config() -> dict[str, str]:
-    """Загружает config.json с настройками логотипа.
+    """Loads config.json with logo settings.
 
-    Возвращает словарь с ключами:
-      logo_path — путь к файлу логотипа (пустая строка → стандартный кот)
-      logo_type — "ascii" или "image"
+    Returns a dict with keys:
+      logo_path — path to logo file (empty string -> default cat)
+      logo_type — "ascii" or "image"
     """
     cfg = dict(_JSON_DEFAULTS)
     if not CONFIG_JSON.exists():
@@ -673,12 +673,12 @@ def load_logo_config() -> dict[str, str]:
 
 
 def _expand(path: str) -> str:
-    """Разворачивает ~ и переменные окружения в пути."""
+    """Expands ~ and environment variables in path."""
     return os.path.expandvars(os.path.expanduser(path))
 
 
 def load_ascii_logo(path: str) -> list[str] | None:
-    """Читает ASCII-арт из файла. При ошибке возвращает None."""
+    """Reads ASCII art from a file. Returns None on error."""
     try:
         full = _expand(path)
         with open(full, encoding="utf-8") as f:
@@ -686,13 +686,13 @@ def load_ascii_logo(path: str) -> list[str] | None:
         return lines
     except FileNotFoundError:
         print(
-            f"⚠️  mewfetch: файл логотипа не найден: {path!r} — используется стандартный кот.",
+            f"⚠️  mewfetch: logo file not found: {path!r} — using default cat.",
             file=sys.stderr,
         )
         return None
     except OSError as e:
         print(
-            f"⚠️  mewfetch: ошибка чтения логотипа ({e}) — используется стандартный кот.",
+            f"⚠️  mewfetch: error reading logo ({e}) — using default cat.",
             file=sys.stderr,
         )
         return None
@@ -702,26 +702,26 @@ ANSI_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
 
 
 def visible_len(s: str) -> int:
-    """Вычисляет реальную видимую ширину строки в терминале без ANSI-кодов и с учётом wide-символов."""
+    """Calculates visible terminal width of string without ANSI codes and accounting for wide characters."""
     clean = ANSI_RE.sub("", s)
     return sum(2 if unicodedata.east_asian_width(c) in ("W", "F") else 1 for c in clean)
 
 
 def render_image_logo(path: str, info_lines: list[str]) -> bool:
-    """Выводит изображение с помощью term-image с адаптивным разрешением и защитой от переполнения.
+    """Renders image using term-image with adaptive resolution and overflow protection.
 
-    - Ограничение img.height = 18 убрано: размер рассчитывается динамически под разрешение терминала.
-    - Приоритет отдаётся нативному протоколу терминала (Kitty/iTerm2) с падением на direct-color BlockImage.
-    - При нехватке места:
-        * ширина < 40 или высота < 15 строк (или не влезает сбоку): картинка уменьшается (до 50%) и выводится СВЕРХУ.
-        * ширина < 35 или высота < 10 строк: картинка отключается, выводится только текст.
-        * достаточно места: картинка выводится СПРАВА с максимальным доступным разрешением.
-    - Если term-image не установлен или файл не найден: вывод ошибки в stderr и возврат False (фоллбэк на ASCII-кота).
+    - Dynamically scales to terminal dimensions.
+    - Prioritizes native terminal protocol (Kitty/iTerm2) falling back to direct-color BlockImage.
+    - Responsive layout for smaller windows/tiling:
+        * width < 40 or height < 15: image is scaled down (50%) and rendered on TOP, info underneath.
+        * width < 35 or height < 10: image is disabled, only text is rendered.
+        * sufficient space: image is rendered on the RIGHT at maximum available resolution.
+    - If term-image is missing or file not found: prints error to stderr and returns False (fallback to ASCII cat).
     """
     full = _expand(path)
     if not os.path.isfile(full):
         print(
-            f"⚠️  mewfetch: файл изображения не найден по пути: '{path}' (полный путь: '{full}')",
+            f"⚠️  mewfetch: image file not found at path: '{path}' (full path: '{full}')",
             file=sys.stderr,
         )
         return False
@@ -730,13 +730,13 @@ def render_image_logo(path: str, info_lines: list[str]) -> bool:
         import term_image
         from term_image.image import from_file, KittyImage
 
-        # Настраиваем динамический масштаб ячейки терминала для правильных пропорций
+        # Configure dynamic terminal cell ratio for proper aspect ratio
         try:
             term_image.set_cell_ratio(term_image.AutoCellRatio.DYNAMIC)
         except Exception:
             pass
 
-        # Настраиваем поддержку Kitty Graphics Protocol без утечки escape-последовательностей
+        # Configure Kitty Graphics Protocol support without leaking escape sequences
         is_kitty = bool(os.environ.get("KITTY_WINDOW_ID") or os.environ.get("TERM") == "xterm-kitty")
         if is_kitty:
             try:
@@ -748,9 +748,9 @@ def render_image_logo(path: str, info_lines: list[str]) -> bool:
             KittyImage._supported = False
     except ImportError:
         print(
-            "⚠️  mewfetch: библиотека term-image не установлена!\n"
-            "   Установите term-image: pip install term-image\n"
-            "   Переключение на стандартного ASCII-кота...",
+            "⚠️  mewfetch: term-image library is required for image rendering.\n"
+            "   Install it with: pip install term-image\n"
+            "   Falling back to default ASCII cat...",
             file=sys.stderr,
         )
         return False
@@ -764,26 +764,26 @@ def render_image_logo(path: str, info_lines: list[str]) -> bool:
                 pass
     except Exception as e:
         print(
-            f"⚠️  mewfetch: ошибка при загрузке изображения через term-image: {e}",
+            f"⚠️  mewfetch: error loading image via term-image: {e}",
             file=sys.stderr,
         )
         return False
 
-    # ── Проверка размера терминала (адаптивная вёрстка под тайлинг и маленькие окна) ──
+    # ── Check terminal size (adaptive layout for tiling and small windows) ──
     term_size = shutil.get_terminal_size((80, 24))
     term_cols = term_size.columns
     term_lines = term_size.lines
     max_info_w = max((visible_len(line) for line in info_lines), default=0)
     info_h = len(info_lines)
 
-    # 1. Если места совсем нет — отключаем картинку и выводим только текст
+    # 1. Very small window — disable image and display only text
     if term_cols < 35 or term_lines < 10:
         for line in info_lines:
             print(line)
         return True
 
-    # 2. Если места не хватает для бокового вывода (ширина < 40 или высота < 15, или вбок не помещается)
-    # Перемещаем картинку НАВЕРХ, уменьшаем пропорционально (50% ширины), а инфо выводим ПОД ней
+    # 2. Not enough room for side-by-side layout (width < 40, height < 15, or doesn't fit horizontally)
+    # Move image to TOP, scale down proportionally (50% width), and print info BELOW it
     if term_cols < max_info_w + 20 or term_cols < 40 or term_lines < 15:
         top_w = max(10, min(int(term_cols * 0.5), term_cols - 2))
         top_h = max(4, min(14, max(term_lines - info_h - 2, 6)))
@@ -801,7 +801,7 @@ def render_image_logo(path: str, info_lines: list[str]) -> bool:
             print(line)
         return True
 
-    # 3. Достаточно места: адаптивный расчет под максимальное доступное разрешение справа
+    # 3. Sufficient space: render on the right with adaptive maximum resolution
     avail_w = max(15, term_cols - max_info_w - 4)
     avail_h = max(info_h, min(term_lines - 2, 50))
     try:
@@ -815,18 +815,18 @@ def render_image_logo(path: str, info_lines: list[str]) -> bool:
     rows = max(len(info_lines), len(img_lines))
     for i in range(rows):
         ip = info_lines[i] if i < len(info_lines) else ""
-        im = img_lines[i] if i < len(img_lines) else ""
+        im = img_lines[i] if i < len(info_lines) else ""
         pad = " " * (max_info_w - visible_len(ip))
         print(f"{ip}{pad}   {im}")
     return True
 
 
 def save_config(args: argparse.Namespace) -> None:
-    """Сохраняет текущие настройки в конфиг файл."""
+    """Saves current settings to the config file."""
     try:
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-            f.write("# mewfetch config — создан автоматически\n")
+            f.write("# mewfetch config — automatically generated\n")
             f.write(f"style    = {args.style}\n")
             f.write(f"theme    = {args.theme}\n")
             if args.fields:
@@ -836,18 +836,18 @@ def save_config(args: argparse.Namespace) -> None:
             f.write(f"show_na  = {'true' if args.show_na else 'false'}\n")
             f.write(f"no_color = {'true' if args.no_color else 'false'}\n")
             f.write(f"no_art   = {'true' if args.no_art else 'false'}\n")
-        print(f"✅ Конфиг сохранён: {CONFIG_PATH}")
+        print(f"✅ Config saved: {CONFIG_PATH}")
     except OSError as e:
-        print(f"❌ Ошибка сохранения конфига: {e}", file=sys.stderr)
+        print(f"❌ Error saving config: {e}", file=sys.stderr)
 
 
-# ─────────────────────────── Форматирование ───────────────────────────────────
+# ─────────────────────────── Formatting ───────────────────────────────────────
 def fmt_row(label: str, value: str, theme: dict[str, str], reset: str = RESET) -> str:
     return f"  {theme['label']}{label:<12}{reset}: {theme['value']}{value}{reset}"
 
 
 def color_swatch(no_color: bool = False) -> list[str]:
-    """Возвращает две строки цветных блоков (8 нормальных + 8 ярких)."""
+    """Returns two rows of color blocks (8 normal + 8 bright)."""
     if no_color:
         return []
     normal = "  " + "".join(f"\033[4{c}m   {RESET}" for c in range(8))
@@ -891,19 +891,19 @@ def render(
             print(line)
         return
 
-    # ── Определяем источник логотипа ──────────────────────────────────────────
+    # ── Determine logo source ──────────────────────────────────────────
     logo_path = (logo_cfg or {}).get("logo_path", "").strip()
     logo_type = (logo_cfg or {}).get("logo_type", "ascii")
 
     if logo_path:
         if logo_type == "image":
-            # Выводим изображение через адаптивный рендерер (сбоку справа либо сверху при нехватке места)
+            # Render image via adaptive renderer (right side, or top when tight)
             if render_image_logo(logo_path, info_lines):
                 return
-            # Если не получилось (нет файла / нет библиотеки) — переключаемся на стандартного кота
+            # On failure (missing file / missing library) — fall back to default cat
             logo_path = ""
         else:
-            # ascii-режим: арт выводится слева, инфо справа
+            # ascii mode: art on the left, info on the right
             custom_lines = load_ascii_logo(logo_path)
             if custom_lines is not None:
                 cat       = custom_lines
@@ -915,9 +915,9 @@ def render(
                     ip = info_lines[i] if i < len(info_lines) else ""
                     print(f"{cat_color}{cp:<{cat_width}}{reset}  {ip}")
                 return
-            # Файл не найден — переключаемся на стандартного кота
+            # File not found — fall back to default cat
 
-    # ── Стандартный ASCII-кот ─────────────────────────────────────────────────
+    # ── Default ASCII cat ─────────────────────────────────────────────────
     cat       = CAT_STYLES.get(style, CAT_STYLES["classic"])
     cat_color = theme.get("cat", "")
     cat_width = max(len(line) for line in cat)
@@ -933,12 +933,12 @@ def render(
 def parse_args(cfg: dict[str, str]) -> argparse.Namespace:
     p = argparse.ArgumentParser(
         prog="mewfetch",
-        description="🐱 mewfetch — система информации с ASCII-котом",
+        description="🐱 mewfetch — a system info tool with an ASCII cat",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
-            f"Темы:  {', '.join(THEMES)}\n"
-            f"Стили: {', '.join(CAT_STYLES)}\n"
-            f"Поля:  {', '.join(FIELD_NAMES)}"
+            f"Themes: {', '.join(THEMES)}\n"
+            f"Styles: {', '.join(CAT_STYLES)}\n"
+            f"Fields: {', '.join(FIELD_NAMES)}"
         ),
     )
     p.add_argument(
@@ -946,58 +946,58 @@ def parse_args(cfg: dict[str, str]) -> argparse.Namespace:
     )
     p.add_argument(
         "--style", default=cfg["style"], choices=list(CAT_STYLES), metavar="STYLE",
-        help=f"Стиль ASCII-кота (по умолчанию: {cfg['style']})",
+        help=f"Cat ASCII art style (default: {cfg['style']})",
     )
     p.add_argument(
         "--theme", default=cfg["theme"], choices=list(THEMES), metavar="THEME",
-        help=f"Цветовая тема (по умолчанию: {cfg['theme']})",
+        help=f"Color theme (default: {cfg['theme']})",
     )
     p.add_argument(
         "--no-color", dest="no_color", action="store_true",
         default=to_bool(cfg.get("no_color", "false")),
-        help="Отключить цвета",
+        help="Disable colors",
     )
     p.add_argument(
         "--color", dest="no_color", action="store_false",
-        help="Включить цвета",
+        help="Enable colors",
     )
     p.add_argument(
         "--no-art", dest="no_art", action="store_true",
         default=to_bool(cfg.get("no_art", "false")),
-        help="Без ASCII-арта",
+        help="Disable ASCII art",
     )
     p.add_argument(
         "--art", dest="no_art", action="store_false",
-        help="С ASCII-артом",
+        help="Enable ASCII art",
     )
     p.add_argument(
         "--show-na", dest="show_na", action="store_true",
         default=to_bool(cfg.get("show_na", "false")),
-        help="Показывать поля со значением N/A",
+        help="Show fields with N/A values",
     )
     p.add_argument(
         "--hide-na", dest="show_na", action="store_false",
-        help="Скрывать поля со значением N/A",
+        help="Hide fields with N/A values",
     )
     p.add_argument(
-        "--fields", default=cfg.get("fields", ""), metavar="ПОЛЕ,...",
-        help="Выбрать конкретные поля через запятую (например: OS,CPU,RAM)",
+        "--fields", default=cfg.get("fields", ""), metavar="FIELD,...",
+        help="Comma-separated list of fields to display (e.g. OS,CPU,RAM)",
     )
-    p.add_argument("--json",        action="store_true", help="Вывод в формате JSON")
-    p.add_argument("--save-config", action="store_true", help="Сохранить настройки в конфиг файл")
-    p.add_argument("--list-styles", action="store_true", help="Показать все доступные стили")
-    p.add_argument("--list-themes", action="store_true", help="Показать все доступные темы")
+    p.add_argument("--json",        action="store_true", help="Output in JSON format")
+    p.add_argument("--save-config", action="store_true", help="Save current settings to config file")
+    p.add_argument("--list-styles", action="store_true", help="List all available styles")
+    p.add_argument("--list-themes", action="store_true", help="List all available themes")
     return p.parse_args()
 
 
-# ─────────────────────────── Точка входа ──────────────────────────────────────
+# ─────────────────────────── Entry Point ──────────────────────────────────────
 def main() -> None:
     cfg      = load_config()
     logo_cfg = load_logo_config()
     args     = parse_args(cfg)
 
     if args.list_styles:
-        print("Доступные стили кота:\n")
+        print("Available cat styles:\n")
         for name, art in CAT_STYLES.items():
             print(f"  [{name}]")
             for line in art:
@@ -1006,38 +1006,38 @@ def main() -> None:
         return
 
     if args.list_themes:
-        print("Доступные темы:\n")
+        print("Available themes:\n")
         for name, t in THEMES.items():
-            print(f"  {t['label']}{name:10}{RESET}  {t['value']}пример текста{RESET}")
+            print(f"  {t['label']}{name:10}{RESET}  {t['value']}sample text{RESET}")
         return
 
     if args.save_config:
         save_config(args)
         return
 
-    # Выбор полей
+    # Field selection
     fields_str = args.fields or cfg.get("fields", "")
     if fields_str:
         wanted = {f.strip().lower() for f in fields_str.split(",") if f.strip()}
         fields = [(l, f) for l, f in ALL_FIELDS if l.lower() in wanted]
         if not fields:
             print(
-                f"Нет таких полей. Доступны: {', '.join(FIELD_NAMES)}",
+                f"No matching fields found. Available: {', '.join(FIELD_NAMES)}",
                 file=sys.stderr,
             )
             sys.exit(1)
     else:
         fields = ALL_FIELDS
 
-    # Параллельный сбор
+    # Concurrent collection
     info = gather_info(fields, show_na=args.show_na)
 
-    # JSON-режим
+    # JSON mode
     if args.json:
         print(json.dumps(dict(info), ensure_ascii=False, indent=2))
         return
 
-    # Отрисовка
+    # Render
     render(
         style=args.style,
         theme=THEMES.get(args.theme, THEMES["pink"]),
