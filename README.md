@@ -2,7 +2,7 @@
 
 <h1>🐱 MewFetch</h1>
 
-<p><em>Лёгкая утилита для отображения системной информации с ASCII-артом кота</em></p>
+<p><em>A lightweight system information tool with cat ASCII art</em></p>
 
 ![screenshot](screenshot.png)
 
@@ -17,30 +17,30 @@
 
 ---
 
-**MewFetch** — минималистичная альтернатива `neofetch` и `fastfetch`, написанная на чистом Python 3.  
-Никаких внешних зависимостей. Только кот и твоя система. 🐾
+**MewFetch** is a minimalist alternative to `neofetch` and `fastfetch` written in pure Python 3.  
+Zero external dependencies. Just a cat and your system. 🐾
 
 ---
 
-## ✨ Возможности
+## ✨ Features
 
-- **Нулевые зависимости** — использует только стандартную библиотеку Python и `/proc`
-- **Параллельный сбор данных** — все поля собираются одновременно через `threading`
-- **19 информационных полей** — включая GPU, диск, батарею, пакеты, IP и тему
-- **6 цветовых тем** — pink, blue, green, red, cyan, mono
-- **4 стиля ASCII-кота** — classic, small, sleeping, box
-- **Полноценный CLI** — `--style`, `--theme`, `--fields`, `--json` и другие
-- **Конфиг файл** — сохрани настройки в `~/.config/mewfetch/config`
-- **Пользовательский логотип** — ASCII-арт или PNG/JPG через `~/.config/mewfetch/config.json`
-- **Поддержка Wayland и X11** — разрешение через `hyprctl` или `xrandr`
-- **JSON-вывод** — для использования в скриптах
+- **Zero dependencies** — uses only the Python standard library and `/proc`
+- **Parallel data fetching** — all fields are gathered concurrently using `threading`
+- **19 information fields** — including GPU, disk, battery, packages, IP, and theme
+- **6 color themes** — pink, blue, green, red, cyan, mono
+- **4 cat ASCII art styles** — classic, small, sleeping, box
+- **Full-featured CLI** — `--style`, `--theme`, `--fields`, `--json`, and more
+- **Config file** — save preferences in `~/.config/mewfetch/config`
+- **Custom logo** — ASCII art or PNG/JPG via `~/.config/mewfetch/config.json`
+- **Wayland and X11 support** — resolution detection via `hyprctl` or `xrandr`
+- **JSON output** — ready for scripting and piping
 
 ---
 
-## 📊 Выводимая информация
+## 📊 Displayed Information
 
-| Поле | Источник |
-|------|----------|
+| Field | Source |
+|-------|--------|
 | **OS** | `/etc/os-release` |
 | **Kernel** | `platform.release()` |
 | **Hostname** | `platform.node()` |
@@ -51,7 +51,7 @@
 | **Swap** | `/proc/meminfo` |
 | **Disk** | `os.statvfs("/")` |
 | **Resolution** | `hyprctl monitors` / `xrandr` |
-| **WM** | env-переменные / список процессов |
+| **WM** | environment variables / process list |
 | **DE** | `XDG_CURRENT_DESKTOP` |
 | **Terminal** | `$TERM_PROGRAM`, `$TERM`, `/proc` |
 | **Shell** | `$SHELL` |
@@ -63,9 +63,9 @@
 
 ---
 
-## 📦 Установка
+## 📦 Installation
 
-### Из исходников (любой дистрибутив)
+### From Source (Any distribution)
 
 ```bash
 git clone https://github.com/zagadka298-design/mewfetch.git
@@ -73,9 +73,9 @@ cd mewfetch
 pip install .
 ```
 
-После этого команда `mewfetch` будет доступна глобально.
+After installation, the `mewfetch` command will be available globally.
 
-### Запуск без установки
+### Running without installation
 
 ```bash
 git clone https://github.com/zagadka298-design/mewfetch.git
@@ -83,58 +83,58 @@ cd mewfetch
 python3 -m mewfetch
 ```
 
-### Из AUR (Arch Linux)
+### From AUR (Arch Linux)
 
 > [!WARNING]
-> AUR-пакет пока не обновлён до v2.1.0 — используйте установку из исходников выше.
+> The AUR package has not been updated to v2.1.0 yet — please use the source installation above.
 
 ```bash
 yay -S mewfetch
-# или
+# or
 paru -S mewfetch
 ```
 
 ---
 
-## 🚀 Использование
+## 🚀 Usage
 
 ```bash
-# Базовый запуск
+# Basic run
 mewfetch
 
-# Выбрать стиль кота
+# Choose cat style
 mewfetch --style sleeping
 
-# Выбрать цветовую тему
+# Choose color theme
 mewfetch --theme blue
 
-# Показать только нужные поля
+# Display only specific fields
 mewfetch --fields OS,CPU,RAM,GPU,Disk
 
-# Без цветов (для pipe/скриптов)
+# Disable colors (useful for pipes/scripts)
 mewfetch --no-color
 
-# Без ASCII-арта
+# Hide ASCII art
 mewfetch --no-art
 
-# Вывод в JSON
+# JSON output
 mewfetch --json
 
-# Сохранить настройки
+# Save settings
 mewfetch --style sleeping --theme cyan --save-config
 
-# Показать все стили
+# List all styles
 mewfetch --list-styles
 
-# Показать все темы
+# List all themes
 mewfetch --list-themes
 ```
 
 ---
 
-## ⚙️ Конфиг файл
+## ⚙️ Configuration File
 
-Настройки хранятся в `~/.config/mewfetch/config` (создаётся автоматически при первом запуске):
+Settings are stored in `~/.config/mewfetch/config` (created automatically on first launch):
 
 ```ini
 # mewfetch config
@@ -146,18 +146,18 @@ no_color = false
 no_art   = false
 ```
 
-Быстрое сохранение настроек через CLI:
+Quickly save configuration via CLI:
 ```bash
 mewfetch --style sleeping --theme cyan --save-config
 ```
 
 ---
 
-## 🖼️ Кастомный логотип (config.json)
+## 🖼️ Custom Logo (config.json)
 
-Помимо основного конфига, mewfetch читает `~/.config/mewfetch/config.json` для настройки логотипа/картинки слева от информации.
+In addition to the main config, mewfetch reads `~/.config/mewfetch/config.json` to configure the logo or image displayed alongside the system info.
 
-Файл создаётся автоматически при первом запуске:
+The file is generated automatically on first run:
 
 ```json
 {
@@ -166,16 +166,16 @@ mewfetch --style sleeping --theme cyan --save-config
 }
 ```
 
-### Параметры
+### Options
 
-| Параметр    | Тип    | Значение по умолчанию | Описание |
-|-------------|--------|-----------------------|----------|
-| `logo_path` | string | `""`                  | Путь к файлу логотипа. Пустая строка → стандартный кот. Поддерживаются `~` и переменные окружения. |
-| `logo_type` | string | `"ascii"`             | Тип файла: `"ascii"` — текстовый арт, `"image"` — PNG/JPG. |
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `logo_path` | string | `""` | Path to the logo file. Empty string → default cat. Supports `~` and environment variables. |
+| `logo_type` | string | `"ascii"` | File type: `"ascii"` for text art, `"image"` for PNG/JPG. |
 
-### Пример 1: ASCII-арт из файла
+### Example 1: ASCII art from a file
 
-1. Создайте файл с артом, например `~/.config/mewfetch/mycat.txt`:
+1. Create a file containing your art, for example `~/.config/mewfetch/mycat.txt`:
    ```
       /\_____/\
      /  ^   ^  \
@@ -184,7 +184,7 @@ mewfetch --style sleeping --theme cyan --save-config
     (__(_____)__)
    ```
 
-2. Укажите путь в `~/.config/mewfetch/config.json`:
+2. Specify the path in `~/.config/mewfetch/config.json`:
    ```json
    {
      "logo_path": "~/.config/mewfetch/mycat.txt",
@@ -192,7 +192,7 @@ mewfetch --style sleeping --theme cyan --save-config
    }
    ```
 
-### Пример 2: PNG/JPG изображение
+### Example 2: PNG/JPG image
 
 ```json
 {
@@ -202,66 +202,66 @@ mewfetch --style sleeping --theme cyan --save-config
 ```
 
 > [!IMPORTANT]
-> Для отображения PNG/JPG изображений используется библиотека **term-image**.
-> Установите её:
+> The **term-image** library is used to render PNG/JPG images in the terminal.
+> Install it:
 > ```bash
 > pip install term-image
-> # или для Arch Linux через pacman:
+> # or on Arch Linux via pacman:
 > sudo pacman -S python-term-image
 > ```
 
 > [!NOTE]
-> Если библиотека `term-image` не установлена или файл по указанному `logo_path` не найден, mewfetch выведет предупреждение в stderr и автоматически отобразит стандартного ASCII-кота.
+> If `term-image` is not installed or the file specified in `logo_path` is not found, mewfetch will print a warning to stderr and fall back to the default ASCII cat.
 
 ---
 
-## 🎨 Темы и стили
+## 🎨 Themes and Styles
 
-### Темы (`--theme`)
-| Тема | Акцент |
-|------|--------|
-| `pink` | Розовый (по умолчанию) |
-| `blue` | Синий |
-| `green` | Зелёный |
-| `red` | Красный |
-| `cyan` | Голубой |
-| `mono` | Монохромный |
+### Themes (`--theme`)
+| Theme | Accent |
+|-------|--------|
+| `pink` | Pink (default) |
+| `blue` | Blue |
+| `green` | Green |
+| `red` | Red |
+| `cyan` | Cyan |
+| `mono` | Monochrome |
 
-### Стили кота (`--style`)
-| Стиль | Описание |
-|-------|----------|
-| `classic` | Три кота в одном (по умолчанию) |
-| `small` | Маленький и компактный |
-| `sleeping` | Дремлющий котик |
-| `box` | В рамочке |
-
----
-
-## 🔧 Зависимости
-
-| Зависимость | Обязательная | Назначение |
-|-------------|:---:|-----------| 
-| **Python 3.10+** | ✅ | Интерпретатор |
-| `lspci` | ⬜ | Информация о GPU |
-| `hyprctl` | ⬜ | Разрешение на Hyprland |
-| `xrandr` | ⬜ | Разрешение на X11 |
-| `gsettings` | ⬜ | GTK-тема и шрифт |
-| `term-image` | ⬜ | Вывод PNG/JPG логотипа (`pip install term-image`) |
-
-> Все основные данные считываются напрямую из `/proc` и `/etc` — без лишних пакетов.
+### Cat Styles (`--style`)
+| Style | Description |
+|-------|-------------|
+| `classic` | Three cats in one (default) |
+| `small` | Small and compact |
+| `sleeping` | Sleeping kitty |
+| `box` | In a frame |
 
 ---
 
-## 🖥️ Совместимость
+## 🔧 Dependencies
 
-| Дистрибутив | Статус |
-|------------|:------:|
+| Dependency | Required | Purpose |
+|------------|:--------:|---------| 
+| **Python 3.10+** | ✅ | Runtime interpreter |
+| `lspci` | ⬜ | GPU detection |
+| `hyprctl` | ⬜ | Screen resolution on Hyprland |
+| `xrandr` | ⬜ | Screen resolution on X11 |
+| `gsettings` | ⬜ | GTK theme and font |
+| `term-image` | ⬜ | PNG/JPG logo rendering (`pip install term-image`) |
+
+> All core metrics are read directly from `/proc` and `/etc` — no extra packages required.
+
+---
+
+## 🖥️ Compatibility
+
+| Distribution | Status |
+|--------------|:------:|
 | EndeavourOS | ✅ |
 | Arch Linux | ✅ |
 | Manjaro | ✅ |
 | Ubuntu / Debian | ✅ |
 | Fedora / openSUSE | ✅ |
-| Другие Linux | ✅ |
+| Other Linux | ✅ |
 | macOS / Windows | ❌ |
 
 **WM/Compositor:**  
@@ -269,13 +269,13 @@ Hyprland · Sway · i3 · bspwm · Openbox · dwm · xmonad · Awesome · Fluxbo
 
 ---
 
-## 📄 Лицензия
+## 📄 License
 
-Распространяется под лицензией [MIT](LICENSE).  
-Делай что хочешь, только не убирай копирайт. 🐱
+Distributed under the [MIT](LICENSE) License.  
+Do whatever you want, just keep the copyright notice. 🐱
 
 ---
 
 <div align="center">
-  <sub>Сделано с ♡ и слишком большим количеством кофе</sub>
+  <sub>Made with ♡ and way too much coffee</sub>
 </div>
