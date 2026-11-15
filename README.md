@@ -65,6 +65,15 @@ Zero external dependencies. Just a cat and your system. 🐾
 
 ## 📦 Installation
 
+### For Arch Linux / EndeavourOS (Recommended)
+
+Arch Linux blocks global pip installs (PEP 668). Use `pipx` to install MewFetch safely:
+
+```bash
+sudo pacman -S python-pipx
+pipx install mewfetch
+```
+
 ### From Source (Any distribution)
 
 ```bash
